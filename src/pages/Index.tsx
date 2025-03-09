@@ -20,8 +20,8 @@ const Index = () => {
     setHasSearched(true);
     
     try {
-      // Call the Supabase Edge Function
-      const { data, error } = await supabase.functions.invoke('scrape-reddit', {
+      // Call the Supabase Edge Function that uses Apify
+      const { data, error } = await supabase.functions.invoke('apify-reddit', {
         body: { keywords, subreddits, limit: 25 }
       });
       
@@ -29,7 +29,7 @@ const Index = () => {
         throw error;
       }
       
-      if (data && data.posts) {
+      if (data && data.posts && data.posts.length > 0) {
         setPosts(data.posts);
         setFilteredPosts(data.posts);
         
