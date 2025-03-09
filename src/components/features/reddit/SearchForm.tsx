@@ -7,12 +7,15 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { X } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { RedditPost } from "./PostCard";
 
 interface SearchFormProps {
   onSearch: (keywords: string[], subreddits: string[]) => void;
+  isLoading: boolean;
 }
 
-const SearchForm = ({ onSearch }: SearchFormProps) => {
+const SearchForm = ({ onSearch, isLoading }: SearchFormProps) => {
   const [keyword, setKeyword] = useState("");
   const [subreddit, setSubreddit] = useState("");
   const [keywords, setKeywords] = useState<string[]>([]);
@@ -40,8 +43,13 @@ const SearchForm = ({ onSearch }: SearchFormProps) => {
     setSubreddits(subreddits.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (keywords.length === 0 && subreddits.length === 0) {
+      return;
+    }
+    
     onSearch(keywords, subreddits);
   };
 
@@ -119,10 +127,10 @@ const SearchForm = ({ onSearch }: SearchFormProps) => {
         <Button 
           type="submit" 
           onClick={handleSubmit}
-          disabled={keywords.length === 0 && subreddits.length === 0}
+          disabled={isLoading || (keywords.length === 0 && subreddits.length === 0)}
           className="w-full"
         >
-          Search Reddit
+          {isLoading ? "Searching..." : "Search Reddit"}
         </Button>
       </CardFooter>
     </Card>

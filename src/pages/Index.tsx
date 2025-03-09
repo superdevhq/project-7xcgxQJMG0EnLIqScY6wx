@@ -7,79 +7,7 @@ import FilterBar from "@/components/features/reddit/FilterBar";
 import { RedditPost } from "@/components/features/reddit/PostCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
-
-// Mock data for initial development
-const MOCK_POSTS: RedditPost[] = [
-  {
-    id: "1",
-    title: "What's your favorite programming language and why?",
-    author: "coder123",
-    subreddit: "programming",
-    upvotes: 342,
-    commentCount: 128,
-    createdAt: new Date().toISOString(),
-    url: "https://reddit.com",
-    selftext: "I've been learning programming for a while now and I'm curious what languages people prefer and why. I've tried Python and JavaScript so far.",
-  },
-  {
-    id: "2",
-    title: "Just finished my first web app! Looking for feedback",
-    author: "webdev_newbie",
-    subreddit: "webdev",
-    upvotes: 89,
-    commentCount: 32,
-    createdAt: new Date(Date.now() - 86400000).toISOString(),
-    url: "https://reddit.com",
-    thumbnail: "https://picsum.photos/seed/picsum/400/300",
-    selftext: "After 3 months of learning, I finally completed my first project - a todo app with authentication and cloud storage!",
-  },
-  {
-    id: "3",
-    title: "The future of AI in software development",
-    author: "ai_enthusiast",
-    subreddit: "artificial",
-    upvotes: 567,
-    commentCount: 231,
-    createdAt: new Date(Date.now() - 172800000).toISOString(),
-    url: "https://reddit.com",
-    thumbnail: "https://picsum.photos/seed/ai/400/300",
-    selftext: "With tools like GitHub Copilot and ChatGPT, how do you think AI will change software development in the next 5 years?",
-  },
-  {
-    id: "4",
-    title: "Best resources for learning React in 2023?",
-    author: "react_learner",
-    subreddit: "reactjs",
-    upvotes: 421,
-    commentCount: 87,
-    createdAt: new Date(Date.now() - 259200000).toISOString(),
-    url: "https://reddit.com",
-    selftext: "I'm looking to learn React properly. What courses, books, or tutorials would you recommend for someone with JavaScript experience?",
-  },
-  {
-    id: "5",
-    title: "Show Reddit: I built a tool that helps you visualize algorithms",
-    author: "algo_visualizer",
-    subreddit: "compsci",
-    upvotes: 1024,
-    commentCount: 156,
-    createdAt: new Date(Date.now() - 345600000).toISOString(),
-    url: "https://reddit.com",
-    thumbnail: "https://picsum.photos/seed/algo/400/300",
-    selftext: "I created a web app that lets you visualize sorting algorithms, pathfinding algorithms, and more. It's open source and I'd love your feedback!",
-  },
-  {
-    id: "6",
-    title: "How to prepare for technical interviews at FAANG companies",
-    author: "interview_prep",
-    subreddit: "cscareerquestions",
-    upvotes: 876,
-    commentCount: 324,
-    createdAt: new Date(Date.now() - 432000000).toISOString(),
-    url: "https://reddit.com",
-    selftext: "I recently went through the interview process at several big tech companies. Here's what worked for me and what I wish I knew beforehand.",
-  },
-];
+import { supabase } from "@/integrations/supabase/client";
 
 const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -87,24 +15,52 @@ const Index = () => {
   const [filteredPosts, setFilteredPosts] = useState<RedditPost[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
 
-  const handleSearch = (keywords: string[], subreddits: string[]) => {
+  const handleSearch = async (keywords: string[], subreddits: string[]) => {
     setIsLoading(true);
     setHasSearched(true);
     
-    // Simulate API call with timeout
-    setTimeout(() => {
-      // In a real app, this would be an API call to your backend
-      // For now, we'll just use mock data
-      const results = MOCK_POSTS;
-      setPosts(results);
-      setFilteredPosts(results);
-      setIsLoading(false);
+    try {
+      // Call the Supabase Edge Function
+      const { data, error } = await supabase.functions.invoke('scrape-reddit', {
+        body: { keywords, subreddits, limit: 25 }
+      });
+      
+      if (error) {
+        throw error;
+      }
+      
+      if (data && data.posts) {
+        setPosts(data.posts);
+        setFilteredPosts(data.posts);
+        
+        toast({
+          title: "Search completed",
+          description: `Found ${data.posts.length} posts matching your criteria`,
+        });
+      } else {
+        setPosts([]);
+        setFilteredPosts([]);
+        
+        toast({
+          title: "No results found",
+          description: "Try different keywords or subreddits",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error searching Reddit:", error);
       
       toast({
-        title: "Search completed",
-        description: `Found ${results.length} posts matching your criteria`,
+        title: "Error searching Reddit",
+        description: error.message || "Something went wrong",
+        variant: "destructive",
       });
-    }, 1500);
+      
+      setPosts([]);
+      setFilteredPosts([]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSortChange = (value: string) => {
@@ -160,7 +116,7 @@ const Index = () => {
           <TabsContent value="search" className="space-y-6">
             <div className="grid gap-6 md:grid-cols-[350px_1fr]">
               <div>
-                <SearchForm onSearch={handleSearch} />
+                <SearchForm onSearch={handleSearch} isLoading={isLoading} />
               </div>
               
               <div className="space-y-4">
