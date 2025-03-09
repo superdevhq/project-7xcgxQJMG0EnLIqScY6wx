@@ -37,11 +37,38 @@ Deno.serve(async (req) => {
 
     // Prepare the input for trudax/reddit-scraper-lite
     const apifyInput = {
-      subreddits: subreddits,
-      searchTerms: keywords,
+      startUrls: [],
+      searches: [],
       maxItems: limit,
       proxy: {
         useApifyProxy: true
+      }
+    }
+
+    // Build searches or startUrls based on subreddits and keywords
+    if (subreddits && subreddits.length > 0) {
+      for (const subreddit of subreddits) {
+        if (keywords && keywords.length > 0) {
+          for (const keyword of keywords) {
+            // Add search for this subreddit and keyword
+            apifyInput.searches.push({
+              subreddit: subreddit,
+              term: keyword
+            })
+          }
+        } else {
+          // Just add the subreddit URL
+          apifyInput.startUrls.push({
+            url: `https://www.reddit.com/r/${subreddit}`
+          })
+        }
+      }
+    } else if (keywords && keywords.length > 0) {
+      for (const keyword of keywords) {
+        // Search all of Reddit for this keyword
+        apifyInput.searches.push({
+          term: keyword
+        })
       }
     }
 
