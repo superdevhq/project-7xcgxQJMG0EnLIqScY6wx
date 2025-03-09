@@ -5,20 +5,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Define the Reddit post type
-interface RedditPost {
-  id: string
-  title: string
-  author: string
-  subreddit: string
-  upvotes: number
-  commentCount: number
-  createdAt: string
-  url: string
-  thumbnail?: string
-  selftext?: string
-}
-
 // Handle OPTIONS request for CORS
 Deno.serve(async (req) => {
   // Handle CORS preflight request
@@ -44,7 +30,7 @@ Deno.serve(async (req) => {
     }
 
     // Build search queries
-    let results: RedditPost[] = []
+    let results = []
     
     // If subreddits are provided, search within those subreddits
     if (subreddits && subreddits.length > 0) {
@@ -100,7 +86,7 @@ Deno.serve(async (req) => {
 /**
  * Fetch Reddit posts from a subreddit
  */
-async function fetchRedditPosts(subreddit: string, query: string, limit: number): Promise<RedditPost[]> {
+async function fetchRedditPosts(subreddit, query, limit) {
   try {
     // Build the URL
     let url = `https://www.reddit.com/r/${subreddit}`
@@ -130,7 +116,7 @@ async function fetchRedditPosts(subreddit: string, query: string, limit: number)
     const data = await response.json()
     
     // Transform the data
-    const posts: RedditPost[] = data.data.children.map((child: any) => {
+    const posts = data.data.children.map((child) => {
       const post = child.data
       return {
         id: post.id,
