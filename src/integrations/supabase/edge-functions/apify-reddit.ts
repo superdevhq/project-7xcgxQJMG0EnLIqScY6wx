@@ -37,7 +37,13 @@ Deno.serve(async (req) => {
 
     // Prepare the input for Apify Reddit Scraper
     const apifyInput = {
-      startUrls: []
+      startUrls: [],
+      maxItems: limit,
+      maxPostCount: limit,
+      maxComments: 0, // We don't need comments for this implementation
+      proxy: {
+        useApifyProxy: true
+      }
     }
 
     // Build start URLs based on subreddits and keywords
@@ -66,64 +72,63 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Set additional options for the scraper
-    apifyInput.maxItems = limit
-    apifyInput.maxPostCount = limit
-    apifyInput.maxComments = 0 // We don't need comments for this implementation
-
-    // Start the Apify task for Reddit scraper
-    const startTaskResponse = await fetch('https://api.apify.com/v2/actor-tasks/reGe2T7rBgKF3NbJW/runs?token=' + apifyApiToken, {
+    // Start the Apify actor for Reddit scraper
+    // Using the Reddit Scraper actor directly (apify/reddit-scraper)
+    const startActorResponse = await fetch('https://api.apify.com/v2/acts/apify~reddit-scraper/runs?token=' + apifyApiToken, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ input: apifyInput }),
+      body: JSON.stringify({ 
+        input: apifyInput,
+        timeout: 120 // 2 minute timeout
+      }),
     })
 
-    if (!startTaskResponse.ok) {
-      const errorText = await startTaskResponse.text()
-      throw new Error(`Failed to start Apify task: ${startTaskResponse.status} ${startTaskResponse.statusText} - ${errorText}`)
+    if (!startActorResponse.ok) {
+      const errorText = await startActorResponse.text()
+      throw new Error(`Failed to start Apify actor: ${startActorResponse.status} ${startActorResponse.statusText} - ${errorText}`)
     }
 
-    const startTaskData = await startTaskResponse.json()
-    const runId = startTaskData.data.id
+    const startActorData = await startActorResponse.json()
+    const runId = startActorData.data.id
 
-    // Wait for the task to finish (with timeout)
-    let taskFinished = false
+    // Wait for the actor to finish (with timeout)
+    let actorFinished = false
     let attempts = 0
-    const maxAttempts = 30 // Maximum 30 attempts (30 seconds)
-    let taskData
+    const maxAttempts = 60 // Maximum 60 attempts (60 seconds)
+    let actorData
 
-    while (!taskFinished && attempts < maxAttempts) {
+    while (!actorFinished && attempts < maxAttempts) {
       // Wait 1 second between checks
       await new Promise(resolve => setTimeout(resolve, 1000))
       
-      // Check task status
+      // Check actor status
       const statusResponse = await fetch(`https://api.apify.com/v2/actor-runs/${runId}?token=${apifyApiToken}`)
       
       if (!statusResponse.ok) {
-        throw new Error(`Failed to check task status: ${statusResponse.status} ${statusResponse.statusText}`)
+        throw new Error(`Failed to check actor status: ${statusResponse.status} ${statusResponse.statusText}`)
       }
       
-      taskData = await statusResponse.json()
+      actorData = await statusResponse.json()
       
-      if (taskData.data.status === 'SUCCEEDED' || taskData.data.status === 'FAILED' || taskData.data.status === 'TIMED-OUT') {
-        taskFinished = true
+      if (actorData.data.status === 'SUCCEEDED' || actorData.data.status === 'FAILED' || actorData.data.status === 'TIMED-OUT' || actorData.data.status === 'ABORTED') {
+        actorFinished = true
       }
       
       attempts++
     }
 
-    if (!taskFinished) {
-      throw new Error('Apify task timed out')
+    if (!actorFinished) {
+      throw new Error('Apify actor timed out')
     }
 
-    if (taskData.data.status !== 'SUCCEEDED') {
-      throw new Error(`Apify task failed with status: ${taskData.data.status}`)
+    if (actorData.data.status !== 'SUCCEEDED') {
+      throw new Error(`Apify actor failed with status: ${actorData.data.status}`)
     }
 
     // Get the dataset items
-    const datasetId = taskData.data.defaultDatasetId
+    const datasetId = actorData.data.defaultDatasetId
     const datasetResponse = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?token=${apifyApiToken}`)
     
     if (!datasetResponse.ok) {
@@ -140,10 +145,10 @@ Deno.serve(async (req) => {
       subreddit: post.subreddit || 'Unknown',
       upvotes: post.score || 0,
       commentCount: post.numComments || 0,
-      createdAt: post.created ? new Date(post.created).toISOString() : new Date().toISOString(),
+      createdAt: post.created ? new Date(post.created * 1000).toISOString() : new Date().toISOString(),
       url: post.url || `https://www.reddit.com/r/${post.subreddit}/comments/${post.id}/`,
       thumbnail: post.thumbnail && post.thumbnail.startsWith('http') ? post.thumbnail : undefined,
-      selftext: post.text || ''
+      selftext: post.selftext || ''
     }))
 
     // Return the results
