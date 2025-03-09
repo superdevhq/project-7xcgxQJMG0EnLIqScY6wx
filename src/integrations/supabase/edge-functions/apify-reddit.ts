@@ -73,8 +73,8 @@ Deno.serve(async (req) => {
     }
 
     // Start the Apify actor for Reddit scraper
-    // Using the Reddit Scraper actor directly (apify/reddit-scraper)
-    const startActorResponse = await fetch('https://api.apify.com/v2/acts/apify~reddit-scraper/runs?token=' + apifyApiToken, {
+    // Using the correct actor ID format
+    const startActorResponse = await fetch('https://api.apify.com/v2/acts/vdrmota~reddit-scraper/runs?token=' + apifyApiToken, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
