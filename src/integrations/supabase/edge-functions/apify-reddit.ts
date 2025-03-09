@@ -35,46 +35,19 @@ Deno.serve(async (req) => {
       throw new Error('APIFY_API_TOKEN is not set')
     }
 
-    // Prepare the input for Apify Reddit Scraper
+    // Prepare the input for trudax/reddit-scraper-lite
     const apifyInput = {
-      startUrls: [],
+      subreddits: subreddits,
+      searchTerms: keywords,
       maxItems: limit,
-      maxPostCount: limit,
-      maxComments: 0, // We don't need comments for this implementation
       proxy: {
         useApifyProxy: true
       }
     }
 
-    // Build start URLs based on subreddits and keywords
-    if (subreddits && subreddits.length > 0) {
-      for (const subreddit of subreddits) {
-        if (keywords && keywords.length > 0) {
-          for (const keyword of keywords) {
-            // Add search URL for this subreddit and keyword
-            apifyInput.startUrls.push({
-              url: `https://www.reddit.com/r/${subreddit}/search/?q=${encodeURIComponent(keyword)}&restrict_sr=1`
-            })
-          }
-        } else {
-          // Just add the subreddit URL
-          apifyInput.startUrls.push({
-            url: `https://www.reddit.com/r/${subreddit}`
-          })
-        }
-      }
-    } else if (keywords && keywords.length > 0) {
-      for (const keyword of keywords) {
-        // Search all of Reddit for this keyword
-        apifyInput.startUrls.push({
-          url: `https://www.reddit.com/search/?q=${encodeURIComponent(keyword)}`
-        })
-      }
-    }
-
     // Start the Apify actor for Reddit scraper
-    // Using the correct actor ID format
-    const startActorResponse = await fetch('https://api.apify.com/v2/acts/vdrmota~reddit-scraper/runs?token=' + apifyApiToken, {
+    // Using trudax/reddit-scraper-lite
+    const startActorResponse = await fetch('https://api.apify.com/v2/acts/trudax~reddit-scraper-lite/runs?token=' + apifyApiToken, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -138,17 +111,18 @@ Deno.serve(async (req) => {
     const redditPosts = await datasetResponse.json()
 
     // Transform Apify data to our format
+    // trudax/reddit-scraper-lite has a different output format
     const posts = redditPosts.map(post => ({
       id: post.id || Math.random().toString(36).substring(2, 15),
       title: post.title || 'No title',
       author: post.author || 'Unknown',
       subreddit: post.subreddit || 'Unknown',
-      upvotes: post.score || 0,
+      upvotes: post.upvotes || 0,
       commentCount: post.numComments || 0,
-      createdAt: post.created ? new Date(post.created * 1000).toISOString() : new Date().toISOString(),
-      url: post.url || `https://www.reddit.com/r/${post.subreddit}/comments/${post.id}/`,
+      createdAt: post.created ? new Date(post.created).toISOString() : new Date().toISOString(),
+      url: post.postUrl || `https://www.reddit.com${post.permalink || ''}`,
       thumbnail: post.thumbnail && post.thumbnail.startsWith('http') ? post.thumbnail : undefined,
-      selftext: post.selftext || ''
+      selftext: post.text || ''
     }))
 
     // Return the results
